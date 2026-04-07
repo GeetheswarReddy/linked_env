@@ -1,0 +1,6 @@
+spec_version: 1
+name: linkedin-env
+type: space
+runtime: fastapi
+app: server.app:main
+port: 7860
