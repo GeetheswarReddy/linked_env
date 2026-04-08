@@ -3,6 +3,8 @@ from .linkedin_env import (
     LinkedInObservation,
     LinkedInEnvironment,
     grade_episode,
+    grade_follower_growth,
+    grade_viral_post,
 )
 from .audience import AudienceSimulator
 from .reward import compute_reward
@@ -12,6 +14,8 @@ __all__ = [
     "LinkedInObservation",
     "LinkedInEnvironment",
     "grade_episode",
+    "grade_follower_growth",
+    "grade_viral_post",
     "AudienceSimulator",
     "compute_reward",
 ]

@@ -4,3 +4,16 @@ type: space
 runtime: fastapi
 app: server.app:main
 port: 8000
+
+tasks:
+  - name: content_optimization
+    description: Maximise mean engagement reward across a 10-step episode
+    grader: env.linkedin_env:grade_episode
+
+  - name: follower_growth
+    description: Achieve at least 3 high-engagement posts (>=0.6) to drive follower growth
+    grader: env.linkedin_env:grade_follower_growth
+
+  - name: viral_post
+    description: Find the optimal post combination to achieve a single viral post (>=0.7 engagement)
+    grader: env.linkedin_env:grade_viral_post

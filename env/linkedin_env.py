@@ -219,3 +219,81 @@ def grade_episode(
         "improvement_rate":  round(improvement_rate, 2),
         "passed":            mean_reward > 0.4,
     }
+
+
+def grade_follower_growth(
+    history: List[Tuple[Dict[str, Any], float]],
+) -> Dict[str, Any]:
+    """
+    Grade an episode based on follower growth strategy.
+
+    Rewards consistent high-engagement posts that compound follower growth.
+    Passes if the agent achieves at least 3 posts above 0.6 engagement.
+
+    Args:
+        history: List of (action_dict, reward) tuples from the episode.
+
+    Returns:
+        Dict with high_engagement_posts, growth_score, peak_reward, passed.
+    """
+    if not history:
+        return {
+            "high_engagement_posts": 0,
+            "growth_score": 0.0,
+            "peak_reward": 0.0,
+            "passed": False,
+        }
+
+    rewards = [r for _, r in history]
+    high_engagement_posts = sum(1 for r in rewards if r >= 0.6)
+    peak_reward = float(max(rewards))
+    # Growth score: weighted toward later steps (compounding effect)
+    weights = [i + 1 for i in range(len(rewards))]
+    growth_score = float(np.average(rewards, weights=weights))
+
+    return {
+        "high_engagement_posts": high_engagement_posts,
+        "growth_score":          round(growth_score, 2),
+        "peak_reward":           round(peak_reward, 2),
+        "passed":                high_engagement_posts >= 3,
+    }
+
+
+def grade_viral_post(
+    history: List[Tuple[Dict[str, Any], float]],
+) -> Dict[str, Any]:
+    """
+    Grade an episode based on achieving a single viral post.
+
+    Rewards the agent for finding the optimal combination of format, hook,
+    timing, and personal storytelling to maximise a single post's reach.
+    Passes if any post achieves >= 0.7 engagement.
+
+    Args:
+        history: List of (action_dict, reward) tuples from the episode.
+
+    Returns:
+        Dict with best_reward, best_action, attempts_to_viral, passed.
+    """
+    if not history:
+        return {
+            "best_reward":       0.0,
+            "best_action":       {},
+            "attempts_to_viral": 0,
+            "passed":            False,
+        }
+
+    best_idx  = int(np.argmax([r for _, r in history]))
+    best_action, best_reward = history[best_idx]
+    viral_threshold = 0.7
+    attempts_to_viral = next(
+        (i + 1 for i, (_, r) in enumerate(history) if r >= viral_threshold),
+        len(history),
+    )
+
+    return {
+        "best_reward":       round(float(best_reward), 2),
+        "best_action":       best_action,
+        "attempts_to_viral": attempts_to_viral,
+        "passed":            float(best_reward) >= viral_threshold,
+    }
