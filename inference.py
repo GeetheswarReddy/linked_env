@@ -1,46 +1,37 @@
 """
-LinkedInEnv inference entry point — Meta PyTorch OpenEnv Hackathon.
-
-Starts the environment server as a subprocess, then runs a full 10-step episode
-where an LLM agent (via OpenAI-compatible API) decides what to post on LinkedIn
-based on the current state and receives a simulated engagement reward.
-
-Required environment variables:
-    HF_TOKEN     — Hugging Face token (mandatory)
-
-Optional environment variables:
-    API_BASE_URL — OpenAI-compatible base URL  (default: https://api.openai.com/v1)
-    MODEL_NAME   — Model to use                (default: gpt-4.1-mini)
-    ENV_PORT     — Port for the local server   (default: 7860)
-
-Usage:
-    python inference.py
+Inference Script — LinkedIn Content Optimisation
+===================================
+MANDATORY environment variables:
+    API_BASE_URL        The API endpoint for the LLM.
+    MODEL_NAME          The model identifier to use for inference.
+    HF_TOKEN            Your Hugging Face / API key.
+    IMAGE_NAME          The local Docker image name for the environment.
 """
-
-from __future__ import annotations
 
 import asyncio
 import json
 import os
-import signal
-import subprocess
-import sys
-import time
+import textwrap
 from typing import Any, Dict, List, Optional
 
-import httpx
 from openai import OpenAI
+
 from openenv.core import EnvClient
 from openenv.core.client_types import StepResult
 from openenv.core.env_server.types import State
 
-# ── env vars ──────────────────────────────────────────────────────────────────
-API_BASE_URL: str = os.environ.get("API_BASE_URL", "https://api.openai.com/v1")
-MODEL_NAME:   str = os.environ.get("MODEL_NAME",   "gpt-4.1-mini")
-HF_TOKEN:     str = os.environ.get("HF_TOKEN", "")
-ENV_PORT:     int = int(os.environ.get("ENV_PORT", "7860"))
+from env import LinkedInAction, LinkedInObservation
 
-EPISODE_LENGTH = 10
+# ── env vars ──────────────────────────────────────────────────────────────────
+IMAGE_NAME   = os.getenv("IMAGE_NAME")
+API_KEY      = os.getenv("HF_TOKEN") or os.getenv("API_KEY")
+API_BASE_URL = os.getenv("API_BASE_URL") or "https://router.huggingface.co/v1"
+MODEL_NAME   = os.getenv("MODEL_NAME") or "Qwen/Qwen2.5-72B-Instruct"
+
+TASK_NAME  = "linkedin-content-optimisation"
+BENCHMARK  = "LinkedInEnv"
+MAX_STEPS  = 10
+SUCCESS_SCORE_THRESHOLD = 0.4  # mean reward threshold (rewards are in [0, 1])
 
 FORMAT_OPTIONS = ["story", "list", "hot_take", "question", "framework"]
 HOOK_OPTIONS   = ["bold_claim", "question", "statistic", "personal_open"]
@@ -61,28 +52,21 @@ ACTION_SCHEMA = {
 
 # ── openenv client ────────────────────────────────────────────────────────────
 
-class LinkedInObservationData:
-    """Lightweight wrapper around the raw observation dict."""
+class LinkedInEnvClient(EnvClient[LinkedInAction, LinkedInObservation, State]):
+    def _step_payload(self, action: LinkedInAction) -> Dict[str, Any]:
+        return action.model_dump(exclude={"metadata"})
 
-    def __init__(self, data: Dict[str, Any]):
-        obs = data.get("observation", data)
-        self.follower_count:       int              = obs.get("follower_count", 1000)
-        self.last_posts:           List[Dict]       = obs.get("last_posts", [])
-        self.days_since_last_post: int              = obs.get("days_since_last_post", 0)
-        self.current_niche:        str              = obs.get("current_niche", "tech")
-        self.episode_step:         int              = obs.get("episode_step", 0)
-        self.reward:               Optional[float]  = data.get("reward")
-        self.done:                 bool             = data.get("done", False)
-
-
-class LinkedInEnvClient(EnvClient):
-    """openenv-core client for LinkedInEnv."""
-
-    def _step_payload(self, action: Dict[str, Any]) -> Dict[str, Any]:
-        return action
-
-    def _parse_result(self, payload: Dict[str, Any]) -> StepResult:
-        obs = LinkedInObservationData(payload)
+    def _parse_result(self, payload: Dict[str, Any]) -> StepResult[LinkedInObservation]:
+        obs_data = payload.get("observation", payload)
+        obs = LinkedInObservation(
+            follower_count=obs_data.get("follower_count", 1000),
+            last_posts=obs_data.get("last_posts", []),
+            days_since_last_post=obs_data.get("days_since_last_post", 0),
+            current_niche=obs_data.get("current_niche", "tech"),
+            episode_step=obs_data.get("episode_step", 0),
+            reward=payload.get("reward"),
+            done=payload.get("done", False),
+        )
         return StepResult(
             observation=obs,
             reward=payload.get("reward"),
@@ -96,9 +80,32 @@ class LinkedInEnvClient(EnvClient):
         )
 
 
+# ── logging helpers ───────────────────────────────────────────────────────────
+
+def log_start(task: str, env: str, model: str) -> None:
+    print(f"[START] task={task} env={env} model={model}", flush=True)
+
+
+def log_step(step: int, action: str, reward: float, done: bool, error: Optional[str]) -> None:
+    error_val = error if error else "null"
+    done_val = str(done).lower()
+    print(
+        f"[STEP] step={step} action={action} reward={reward:.2f} done={done_val} error={error_val}",
+        flush=True,
+    )
+
+
+def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> None:
+    rewards_str = ",".join(f"{r:.2f}" for r in rewards)
+    print(
+        f"[END] success={str(success).lower()} steps={steps} score={score:.3f} rewards={rewards_str}",
+        flush=True,
+    )
+
+
 # ── LLM agent ─────────────────────────────────────────────────────────────────
 
-def build_prompt(obs: LinkedInObservationData) -> str:
+def build_prompt(obs: Any, step: int) -> str:
     last_posts_text = ""
     if obs.last_posts:
         for i, p in enumerate(obs.last_posts, 1):
@@ -110,177 +117,130 @@ def build_prompt(obs: LinkedInObservationData) -> str:
     else:
         last_posts_text = "  None yet.\n"
 
-    return f"""You are an expert LinkedIn content strategist.
+    return textwrap.dedent(f"""
+        You are an expert LinkedIn content strategist.
 
-## Current State
-- Follower count: {obs.follower_count}
-- Content niche: {obs.current_niche}
-- Days since last post: {obs.days_since_last_post}
-- Episode step: {obs.episode_step} / {EPISODE_LENGTH}
-- Recent posts:
-{last_posts_text}
+        ## Current State
+        - Follower count: {obs.follower_count}
+        - Content niche: {obs.current_niche}
+        - Days since last post: {obs.days_since_last_post}
+        - Episode step: {step} / {MAX_STEPS}
+        - Recent posts:
+        {last_posts_text}
+        ## Task
+        Decide the next LinkedIn post to maximise audience engagement.
 
-## Task
-Decide the next LinkedIn post to maximise audience engagement.
+        ## Action fields (all required)
+        {json.dumps(ACTION_SCHEMA, indent=2)}
 
-## Action fields (all required)
-{json.dumps(ACTION_SCHEMA, indent=2)}
+        ## Instructions
+        - Consider which format, hook and time performs best for the "{obs.current_niche}" niche.
+        - Tuesday and Wednesday mornings get 1.3x reach.
+        - Personal stories + personal hooks get 1.4x comment rate.
+        - List format gets 1.2x share rate.
+        - Respond ONLY with a single valid JSON object. No explanation, no markdown, no extra text.
 
-## Instructions
-- Consider which format, hook and time performs best for the "{obs.current_niche}" niche.
-- Tuesday and Wednesday mornings get 1.3x reach.
-- Personal stories + personal hooks get 1.4x comment rate.
-- List format gets 1.2x share rate.
-- Respond ONLY with a single valid JSON object. No explanation, no markdown, no extra text.
-
-Example valid response:
-{{"topic": "lessons from my first failed startup", "format": "story", "hook_type": "personal_open", "post_time": "tue_morning", "has_question": true, "is_personal": true, "length": "medium"}}
-"""
-
-
-def get_llm_action(client: OpenAI, obs: LinkedInObservationData) -> Dict[str, Any]:
-    prompt = build_prompt(obs)
-    response = client.chat.completions.create(
-        model=MODEL_NAME,
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "You are a LinkedIn content optimisation agent. "
-                    "Always respond with a single valid JSON object and nothing else."
-                ),
-            },
-            {"role": "user", "content": prompt},
-        ],
-        temperature=0.7,
-        max_tokens=300,
-    )
-    raw = response.choices[0].message.content.strip()
-    # Strip markdown fences if present
-    if raw.startswith("```"):
-        raw = raw.split("```")[1]
-        if raw.startswith("json"):
-            raw = raw[4:]
-    return json.loads(raw.strip())
+        Example valid response:
+        {{"topic": "lessons from my first failed startup", "format": "story", "hook_type": "personal_open", "post_time": "tue_morning", "has_question": true, "is_personal": true, "length": "medium"}}
+    """).strip()
 
 
-# ── server lifecycle ──────────────────────────────────────────────────────────
-
-def _wait_for_server(port: int, timeout: float = 30.0) -> None:
-    """Poll /health until the server is ready."""
-    deadline = time.monotonic() + timeout
-    url = f"http://localhost:{port}/health"
-    while time.monotonic() < deadline:
-        try:
-            r = httpx.get(url, timeout=2.0)
-            if r.status_code == 200:
-                return
-        except Exception:
-            pass
-        time.sleep(0.5)
-    raise RuntimeError(f"Server on port {port} did not become ready within {timeout}s")
-
-
-def _start_server(port: int) -> subprocess.Popen:
-    """Launch the uvicorn server as a background subprocess."""
-    cmd = [
-        sys.executable, "-m", "uvicorn",
-        "server.app:app",
-        "--host", "0.0.0.0",
-        "--port", str(port),
-        "--log-level", "warning",
-    ]
-    proc = subprocess.Popen(
-        cmd,
-        cwd=os.path.dirname(os.path.abspath(__file__)),
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        preexec_fn=os.setsid,
-    )
-    return proc
+def get_llm_action(client: OpenAI, obs: Any, step: int) -> Dict[str, Any]:
+    prompt = build_prompt(obs, step)
+    try:
+        response = client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a LinkedIn content optimisation agent. "
+                        "Always respond with a single valid JSON object and nothing else."
+                    ),
+                },
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.7,
+            max_tokens=300,
+            stream=False,
+        )
+        raw = (response.choices[0].message.content or "").strip()
+        # Strip markdown fences if present
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        return json.loads(raw.strip())
+    except Exception as exc:
+        print(f"[DEBUG] Model request failed: {exc}", flush=True)
+        return {
+            "topic": "productivity tips",
+            "format": "list",
+            "hook_type": "bold_claim",
+            "post_time": "tue_morning",
+            "has_question": True,
+            "is_personal": False,
+            "length": "medium",
+        }
 
 
 # ── main episode loop ─────────────────────────────────────────────────────────
 
-async def run_episode() -> None:
-    if not HF_TOKEN:
-        raise ValueError("HF_TOKEN environment variable is required but not set.")
+async def main() -> None:
+    client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
 
-    openai_client = OpenAI(api_key=HF_TOKEN, base_url=API_BASE_URL)
+    env = await LinkedInEnvClient.from_docker_image(IMAGE_NAME)
 
-    print(f"[START] task=linkedin-content-optimisation env=LinkedInEnv model={MODEL_NAME}")
-
-    server_proc: Optional[subprocess.Popen] = None
     rewards: List[float] = []
-    steps_done = 0
+    steps_taken = 0
+    score = 0.0
     success = False
-    error_msg: Optional[str] = None
+
+    log_start(task=TASK_NAME, env=BENCHMARK, model=MODEL_NAME)
 
     try:
-        # Start server
-        server_proc = _start_server(ENV_PORT)
-        _wait_for_server(ENV_PORT)
+        result = await env.reset()
+        obs = result.observation
 
-        base_url = f"http://localhost:{ENV_PORT}"
+        for step in range(1, MAX_STEPS + 1):
+            if result.done:
+                break
 
-        async with LinkedInEnvClient(base_url=base_url) as env:
-            # Reset
-            result = await env.reset(seed=42)
-            obs: LinkedInObservationData = result.observation
+            action_dict: Optional[Dict[str, Any]] = None
+            reward_val: float = 0.0
+            done = False
+            error: Optional[str] = None
 
-            # Episode loop
-            for step in range(1, EPISODE_LENGTH + 1):
-                step_error: Optional[str] = None
-                action_dict: Optional[Dict[str, Any]] = None
-                reward_val: float = 0.0
-                done = False
+            try:
+                action_dict = get_llm_action(client, obs, step)
+                result = await env.step(LinkedInAction(**action_dict))
+                obs = result.observation
+                reward_val = float(result.reward) if result.reward is not None else 0.0
+                done = result.done
+            except Exception as exc:
+                error = str(exc)
+                done = True
 
-                try:
-                    action_dict = get_llm_action(openai_client, obs)
-                    result = await env.step(action_dict)
-                    obs = result.observation
-                    reward_val = float(result.reward) if result.reward is not None else 0.0
-                    done = result.done
-                    rewards.append(reward_val)
-                    steps_done = step
-                except Exception as e:
-                    step_error = str(e)
-                    done = True
+            rewards.append(reward_val)
+            steps_taken = step
 
-                action_str = json.dumps(action_dict) if action_dict else "null"
-                print(
-                    f"[STEP] step={step} "
-                    f"action={action_str} "
-                    f"reward={reward_val:.2f} "
-                    f"done={str(done).lower()} "
-                    f"error={step_error if step_error else 'null'}"
-                )
+            action_str = json.dumps(action_dict) if action_dict else "null"
+            log_step(step=step, action=action_str, reward=reward_val, done=done, error=error)
 
-                if done:
-                    break
+            if done:
+                break
 
-        success = steps_done >= EPISODE_LENGTH and not error_msg
-
-    except Exception as e:
-        error_msg = str(e)
-        success = False
+        score = sum(rewards) / MAX_STEPS if MAX_STEPS > 0 else 0.0
+        score = min(max(score, 0.0), 1.0)
+        success = score >= SUCCESS_SCORE_THRESHOLD
 
     finally:
-        # Always emit [END]
-        rewards_str = ",".join(f"{r:.2f}" for r in rewards)
-        print(
-            f"[END] success={str(success).lower()} "
-            f"steps={steps_done} "
-            f"rewards={rewards_str}"
-        )
-
-        # Shut down server
-        if server_proc is not None:
-            try:
-                os.killpg(os.getpgid(server_proc.pid), signal.SIGTERM)
-            except Exception:
-                server_proc.terminate()
+        try:
+            await env.close()
+        except Exception as e:
+            print(f"[DEBUG] env.close() error: {e}", flush=True)
+        log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
 
 
 if __name__ == "__main__":
-    asyncio.run(run_episode())
+    asyncio.run(main())
