@@ -1,3 +1,9 @@
+---
+title: LinkedInEnv
+sdk: docker
+app_port: 8000
+---
+
 # LinkedInEnv
 
 A reinforcement learning environment where an LLM agent learns to optimise LinkedIn content strategy.
