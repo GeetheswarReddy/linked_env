@@ -25,7 +25,7 @@ from env import LinkedInAction, LinkedInObservation
 # ── env vars ──────────────────────────────────────────────────────────────────
 IMAGE_NAME   = os.getenv("IMAGE_NAME")
 HF_SPACE_ID  = os.getenv("HF_SPACE_ID", "GeethuR/linkedIn_env")
-API_KEY      = os.getenv("HF_TOKEN") or os.getenv("API_KEY")
+HF_TOKEN     = os.getenv("HF_TOKEN")
 API_BASE_URL = os.getenv("API_BASE_URL") or "https://router.huggingface.co/v1"
 MODEL_NAME   = os.getenv("MODEL_NAME") or "Qwen/Qwen2.5-72B-Instruct"
 
@@ -188,7 +188,7 @@ def get_llm_action(client: OpenAI, obs: Any, step: int) -> Dict[str, Any]:
 # ── main episode loop ─────────────────────────────────────────────────────────
 
 async def main() -> None:
-    client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
+    client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
 
     if IMAGE_NAME:
         env = await LinkedInEnvClient.from_docker_image(IMAGE_NAME)
