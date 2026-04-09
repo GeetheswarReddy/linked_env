@@ -29,8 +29,8 @@ HF_TOKEN     = os.getenv("HF_TOKEN")
 API_BASE_URL = os.getenv("API_BASE_URL") or "https://router.huggingface.co/v1"
 MODEL_NAME   = os.getenv("MODEL_NAME") or "Qwen/Qwen2.5-72B-Instruct"
 
-TASK_NAME  = "linkedin-content-optimisation"
-BENCHMARK  = "LinkedInEnv"
+TASK_NAME  = os.getenv("TASK_NAME", "content_optimization")
+BENCHMARK  = os.getenv("BENCHMARK", "LinkedInEnv")
 MAX_STEPS  = 10
 SUCCESS_SCORE_THRESHOLD = 0.4  # mean reward threshold (rewards are in [0, 1])
 
@@ -203,7 +203,7 @@ async def main() -> None:
     log_start(task=TASK_NAME, env=BENCHMARK, model=MODEL_NAME)
 
     try:
-        result = await env.reset()
+        result = await env.reset(task_id=TASK_NAME)
         obs = result.observation
 
         for step in range(1, MAX_STEPS + 1):
