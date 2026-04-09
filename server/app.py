@@ -51,6 +51,7 @@ TASKS = [
         "max_steps": 10,
         "score_field": "mean_reward",
         "pass_threshold": 0.4,
+        "grader": "env.graders.grader_content_optimization",
     },
     {
         "id": "follower_growth",
@@ -59,6 +60,7 @@ TASKS = [
         "max_steps": 10,
         "score_field": "growth_score",
         "pass_threshold": 0.6,
+        "grader": "env.graders.grader_follower_growth",
     },
     {
         "id": "viral_post",
@@ -67,6 +69,7 @@ TASKS = [
         "max_steps": 10,
         "score_field": "best_reward",
         "pass_threshold": 0.7,
+        "grader": "env.graders.grader_viral_post",
     },
 ]
 
@@ -107,7 +110,7 @@ def grade(request: GradeRequest) -> Dict[str, Any]:
             "passed": False,
         }
     score = float(grader_fn(request.history))
-    score = min(max(score, 0.001), 0.999)
+    score = min(max(score, 0.0), 1.0)
     task_meta = next((t for t in TASKS if t["id"] == request.task), {})
     return {
         "score": round(score, 3),

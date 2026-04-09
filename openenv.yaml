@@ -10,13 +10,16 @@ tasks:
     description: Maximise mean engagement reward across a 10-step episode
     difficulty: easy
     max_steps: 10
+    grader: env.graders.grader_content_optimization
 
   - id: follower_growth
     description: Achieve at least 3 high-engagement posts (>=0.6) to drive follower growth
     difficulty: medium
     max_steps: 10
+    grader: env.graders.grader_follower_growth
 
   - id: viral_post
     description: Find the optimal post combination to achieve a single viral post (>=0.7 engagement)
     difficulty: hard
     max_steps: 10
+    grader: env.graders.grader_viral_post

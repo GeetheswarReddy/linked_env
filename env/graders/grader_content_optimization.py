@@ -1,7 +1,7 @@
 """Grader for the content_optimization task.
 
 Grades based on mean engagement reward across the episode.
-Returns a float in (0.001, 0.999).
+Returns a float in [0.0, 1.0].
 """
 
 from __future__ import annotations
@@ -18,11 +18,11 @@ def grade(history: List[Tuple[Dict[str, Any], float]]) -> float:
         history: List of (action_dict, reward) tuples from the episode.
 
     Returns:
-        Mean engagement reward clamped to (0.001, 0.999).
+        Mean engagement reward clamped to [0.0, 1.0].
     """
     if not history:
-        return 0.001
+        return 0.0
 
     rewards = [float(r) for _, r in history]
     score = float(np.mean(rewards))
-    return max(0.001, min(0.999, round(score, 3)))
+    return max(0.0, min(1.0, round(score, 3)))

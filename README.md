@@ -116,5 +116,4 @@ docker build -t linkedin-env .
 docker run -p 7860:7860 linkedin-env
 ```
 
-The server is then available at `http://localhost:7860`.
->>>>>>> 1e71d947e3284686488e9f613fc6bb5358f7106d
+The server is then available at `http://localhost:8000`.
