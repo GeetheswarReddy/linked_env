@@ -22,15 +22,11 @@ except ImportError as e:
     raise ImportError("openenv-core is required. Install with: pip install openenv-core") from e
 
 try:
-    from env.linkedin_env import (
-        LinkedInAction, LinkedInEnvironment, LinkedInObservation,
-        grade_episode, grade_follower_growth, grade_viral_post,
-    )
+    from env.linkedin_env import LinkedInAction, LinkedInEnvironment, LinkedInObservation
+    from env.graders import grade_content_optimization, grade_follower_growth, grade_viral_post
 except ModuleNotFoundError:
-    from linkedin_env import (
-        LinkedInAction, LinkedInEnvironment, LinkedInObservation,
-        grade_episode, grade_follower_growth, grade_viral_post,
-    )
+    from linkedin_env import LinkedInAction, LinkedInEnvironment, LinkedInObservation
+    from graders import grade_content_optimization, grade_follower_growth, grade_viral_post
 
 from fastapi import FastAPI
 from fastapi.routing import APIRouter
@@ -75,7 +71,7 @@ TASKS = [
 ]
 
 _GRADER_FN = {
-    "content_optimization": grade_episode,
+    "content_optimization": grade_content_optimization,
     "follower_growth":      grade_follower_growth,
     "viral_post":           grade_viral_post,
 }
@@ -110,13 +106,13 @@ def grade(request: GradeRequest) -> Dict[str, Any]:
             "score": 0.0,
             "passed": False,
         }
-    result = grader_fn(request.history)
-    task_meta = next((t for t in TASKS if t["name"] == request.task), {})
-    score_field = task_meta.get("score_field", "mean_reward")
-    score = float(result.get(score_field, 0.0))
-    score = min(max(score, 0.01), 0.99)
-    result["score"] = round(score, 3)
-    return result
+    score = float(grader_fn(request.history))
+    score = min(max(score, 0.001), 0.999)
+    task_meta = next((t for t in TASKS if t["id"] == request.task), {})
+    return {
+        "score": round(score, 3),
+        "passed": score >= task_meta.get("pass_threshold", 0.4),
+    }
 
 
 def main() -> None:
