@@ -79,8 +79,8 @@ def compute_reward(
     # 7. Gaussian noise (non-deterministic variance in virality)
     raw += float(rng.normal(0.0, NOISE_STD))
 
-    # 8. Normalise to [0, 1]
+    # 8. Normalise to (0.001, 0.999) — open bounds required by validator
     normalised = (raw - RAW_MIN) / (RAW_MAX - RAW_MIN)
-    normalised = float(np.clip(normalised, 0.0, 1.0))
+    normalised = float(np.clip(normalised, 0.001, 0.999))
 
-    return round(normalised, 2)
+    return round(normalised, 3)
