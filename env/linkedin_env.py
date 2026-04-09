@@ -70,6 +70,8 @@ class LinkedInEnvironment(Environment):
 
     SUPPORTS_CONCURRENT_SESSIONS: bool = True
 
+    TASK_IDS = ["content_optimization", "follower_growth", "viral_post"]
+
     def __init__(self) -> None:
         super().__init__()
         self._state   = State(episode_id=str(uuid4()), step_count=0)
@@ -78,6 +80,7 @@ class LinkedInEnvironment(Environment):
         self._followers: int = 1000
         self._post_history: List[Dict[str, Any]] = []
         self._days_since: int = 0
+        self._task_id: str = "content_optimization"
 
     # ── Gym API ──────────────────────────────────────────────────────────────
 
@@ -85,6 +88,7 @@ class LinkedInEnvironment(Environment):
         self,
         seed: Optional[int] = None,
         episode_id: Optional[str] = None,
+        task_id: Optional[str] = None,
         **kwargs: Any,
     ) -> LinkedInObservation:
         if seed is not None:
@@ -94,6 +98,7 @@ class LinkedInEnvironment(Environment):
             self._rng = np.random.default_rng(None)
             _py_rng = random.Random()
 
+        self._task_id    = task_id if task_id in self.TASK_IDS else "content_optimization"
         self._niche      = _py_rng.choice(NICHES)
         self._followers  = int(self._rng.integers(500, 5000))
         self._post_history = []
@@ -136,6 +141,21 @@ class LinkedInEnvironment(Environment):
         self._post_history.append(post_record)
 
         done = step >= EPISODE_LENGTH
+
+        # On final step, override reward with task grader score
+        if done:
+            history = [(p, p["engagement_score"]) for p in self._post_history]
+            if self._task_id == "follower_growth":
+                grade = grade_follower_growth(history)
+                reward = float(grade["growth_score"])
+            elif self._task_id == "viral_post":
+                grade = grade_viral_post(history)
+                reward = float(grade["best_reward"])
+            else:
+                grade = grade_episode(history)
+                reward = float(grade["mean_reward"])
+            reward = round(min(max(reward, 0.01), 0.99), 2)
+
         return self._build_obs(reward=reward, done=done)
 
     @property
