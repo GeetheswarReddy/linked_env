@@ -83,4 +83,4 @@ def compute_reward(
     normalised = (raw - RAW_MIN) / (RAW_MAX - RAW_MIN)
     normalised = float(np.clip(normalised, 0.001, 0.999))
 
-    return round(normalised, 3)
+    return round(normalised, 2)
