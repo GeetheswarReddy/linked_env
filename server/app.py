@@ -111,7 +111,7 @@ def grade(request: GradeRequest) -> Dict[str, Any]:
     task_meta = next((t for t in TASKS if t["name"] == request.task), {})
     score_field = task_meta.get("score_field", "mean_reward")
     score = float(result.get(score_field, 0.0))
-    score = min(max(score, 0.001), 0.999)
+    score = min(max(score, 0.01), 0.99)
     result["score"] = round(score, 3)
     return result
 

@@ -81,6 +81,6 @@ def compute_reward(
 
     # 8. Normalise to (0.001, 0.999) — open bounds required by validator
     normalised = (raw - RAW_MIN) / (RAW_MAX - RAW_MIN)
-    normalised = float(np.clip(normalised, 0.001, 0.999))
+    normalised = float(np.clip(normalised, 0.01, 0.99))
 
     return round(normalised, 2)

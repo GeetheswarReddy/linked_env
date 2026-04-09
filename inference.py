@@ -235,7 +235,7 @@ async def main() -> None:
                 break
 
         score = sum(rewards) / MAX_STEPS if MAX_STEPS > 0 else 0.0
-        score = min(max(score, 0.001), 0.999)
+        score = min(max(score, 0.01), 0.99)
         success = score >= SUCCESS_SCORE_THRESHOLD
 
     finally:
