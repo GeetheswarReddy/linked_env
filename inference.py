@@ -185,25 +185,19 @@ def get_llm_action(client: OpenAI, obs: Any, step: int) -> Dict[str, Any]:
         }
 
 
-# ── main episode loop ─────────────────────────────────────────────────────────
+# ── single task episode ───────────────────────────────────────────────────────
 
-async def main() -> None:
-    client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
-
-    if IMAGE_NAME:
-        env = await LinkedInEnvClient.from_docker_image(IMAGE_NAME)
-    else:
-        env = await LinkedInEnvClient.from_env(HF_SPACE_ID)
-
+async def run_task(env: Any, client: OpenAI, task_name: str) -> None:
+    """Run one complete episode for the given task and emit [START]..[END] logs."""
     rewards: List[float] = []
     steps_taken = 0
     score = 0.0
     success = False
 
-    log_start(task=TASK_NAME, env=BENCHMARK, model=MODEL_NAME)
+    log_start(task=task_name, env=BENCHMARK, model=MODEL_NAME)
 
     try:
-        result = await env.reset(task_id=TASK_NAME)
+        result = await env.reset(task_id=task_name)
         obs = result.observation
 
         for step in range(1, MAX_STEPS + 1):
@@ -239,11 +233,30 @@ async def main() -> None:
         success = score >= SUCCESS_SCORE_THRESHOLD
 
     finally:
+        log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
+
+
+# ── main: run all 3 tasks ─────────────────────────────────────────────────────
+
+ALL_TASKS = ["content_optimization", "follower_growth", "viral_post"]
+
+
+async def main() -> None:
+    client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
+
+    if IMAGE_NAME:
+        env = await LinkedInEnvClient.from_docker_image(IMAGE_NAME)
+    else:
+        env = await LinkedInEnvClient.from_env(HF_SPACE_ID)
+
+    try:
+        for task_name in ALL_TASKS:
+            await run_task(env, client, task_name)
+    finally:
         try:
             await env.close()
         except Exception as e:
             print(f"[DEBUG] env.close() error: {e}", flush=True)
-        log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
 
 
 if __name__ == "__main__":

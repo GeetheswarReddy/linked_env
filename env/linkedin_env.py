@@ -22,7 +22,11 @@ from openenv.core.env_server.types import Action, Observation, State
 
 from .audience import AudienceSimulator
 from .reward import compute_reward
-from .graders import grade_content_optimization, grade_follower_growth, grade_viral_post
+from .graders import (
+    grade_content_optimization as _grade_content_optimization,
+    grade_follower_growth as _grade_follower_growth,
+    grade_viral_post as _grade_viral_post,
+)
 
 # ── constants ────────────────────────────────────────────────────────────────
 EPISODE_LENGTH = 10
@@ -147,11 +151,11 @@ class LinkedInEnvironment(Environment):
         if done:
             history = [(p, p["engagement_score"]) for p in self._post_history]
             if self._task_id == "follower_growth":
-                reward = grade_follower_growth(history)
+                reward = _grade_follower_growth(history)
             elif self._task_id == "viral_post":
-                reward = grade_viral_post(history)
+                reward = _grade_viral_post(history)
             else:
-                reward = grade_content_optimization(history)
+                reward = _grade_content_optimization(history)
             reward = round(min(max(reward, 0.01), 0.99), 2)
 
         return self._build_obs(reward=reward, done=done)
