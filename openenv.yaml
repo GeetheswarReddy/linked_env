@@ -1,25 +1,55 @@
+version: "1.0"
 spec_version: 1
-name: linkedin-env
-type: space
-runtime: fastapi
-app: server.app:main
-port: 8000
+name: "linkedin-env"
+benchmark: "LinkedInEnv"
+type: "space"
+runtime: "fastapi"
+app: "server.app:app"
+port: 7860
+
+entrypoint: "python3 inference.py"
+timeout: 300
+memory_limit: "4Gi"
 
 tasks:
-  - id: content_optimization
-    description: Maximise mean engagement reward across a 10-step episode
-    difficulty: easy
+  - id: "content_optimization"
+    task_id: "content_optimization"
+    name: "content_optimization"
+    description: "Easy: maximise mean engagement reward across a 10-step episode."
+    objective: "Choose the best format, hook, and timing to maximise average engagement across all posts."
+    difficulty: "easy"
     max_steps: 10
-    grader: env.graders.grader_content_optimization
+    grader: "programmatic"
+    grader_type: "programmatic"
+    has_grader: true
+    score_range: [0.01, 0.99]
+    pass_score: 0.40
+    weight: 1.0
 
-  - id: follower_growth
-    description: Achieve at least 3 high-engagement posts (>=0.6) to drive follower growth
-    difficulty: medium
+  - id: "follower_growth"
+    task_id: "follower_growth"
+    name: "follower_growth"
+    description: "Medium: achieve at least 3 high-engagement posts (>=0.6) to drive follower growth."
+    objective: "Achieve consistent high-engagement posts with a weighted score favouring later steps."
+    difficulty: "medium"
     max_steps: 10
-    grader: env.graders.grader_follower_growth
+    grader: "programmatic"
+    grader_type: "programmatic"
+    has_grader: true
+    score_range: [0.01, 0.99]
+    pass_score: 0.60
+    weight: 1.0
 
-  - id: viral_post
-    description: Find the optimal post combination to achieve a single viral post (>=0.7 engagement)
-    difficulty: hard
+  - id: "viral_post"
+    task_id: "viral_post"
+    name: "viral_post"
+    description: "Hard: find the optimal post combination to achieve a single viral post (>=0.7 engagement)."
+    objective: "Find the optimal format+hook+timing combination to achieve a single viral post."
+    difficulty: "hard"
     max_steps: 10
-    grader: env.graders.grader_viral_post
+    grader: "programmatic"
+    grader_type: "programmatic"
+    has_grader: true
+    score_range: [0.01, 0.99]
+    pass_score: 0.70
+    weight: 1.0

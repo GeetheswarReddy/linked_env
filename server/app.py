@@ -46,30 +46,48 @@ app = create_app(
 TASKS = [
     {
         "id": "content_optimization",
-        "description": "Maximise mean engagement reward across a 10-step episode.",
+        "task_id": "content_optimization",
+        "name": "content_optimization",
+        "description": "Easy: maximise mean engagement reward across a 10-step episode.",
+        "objective": "Choose the best format, hook, and timing to maximise average engagement across all posts.",
         "difficulty": "easy",
         "max_steps": 10,
-        "score_field": "mean_reward",
-        "pass_threshold": 0.4,
-        "grader": "env.graders.grader_content_optimization",
+        "grader": "programmatic",
+        "grader_type": "programmatic",
+        "has_grader": True,
+        "score_range": [0.01, 0.99],
+        "pass_score": 0.40,
+        "weight": 1.0,
     },
     {
         "id": "follower_growth",
-        "description": "Achieve at least 3 high-engagement posts (>=0.6) to drive follower growth.",
+        "task_id": "follower_growth",
+        "name": "follower_growth",
+        "description": "Medium: achieve at least 3 high-engagement posts (>=0.6) to drive follower growth.",
+        "objective": "Achieve consistent high-engagement posts with a weighted score favouring later steps.",
         "difficulty": "medium",
         "max_steps": 10,
-        "score_field": "growth_score",
-        "pass_threshold": 0.6,
-        "grader": "env.graders.grader_follower_growth",
+        "grader": "programmatic",
+        "grader_type": "programmatic",
+        "has_grader": True,
+        "score_range": [0.01, 0.99],
+        "pass_score": 0.60,
+        "weight": 1.0,
     },
     {
         "id": "viral_post",
-        "description": "Find the optimal post combination to achieve a single viral post (>=0.7 engagement).",
+        "task_id": "viral_post",
+        "name": "viral_post",
+        "description": "Hard: find the optimal post combination to achieve a single viral post (>=0.7 engagement).",
+        "objective": "Find the optimal format+hook+timing combination to achieve a single viral post.",
         "difficulty": "hard",
         "max_steps": 10,
-        "score_field": "best_reward",
-        "pass_threshold": 0.7,
-        "grader": "env.graders.grader_viral_post",
+        "grader": "programmatic",
+        "grader_type": "programmatic",
+        "has_grader": True,
+        "score_range": [0.01, 0.99],
+        "pass_score": 0.70,
+        "weight": 1.0,
     },
 ]
 
@@ -121,7 +139,7 @@ def grade(request: GradeRequest) -> Dict[str, Any]:
 def main() -> None:
     """Entry point for uv run and openenv tooling."""
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=7860)
 
 
 if __name__ == "__main__":
