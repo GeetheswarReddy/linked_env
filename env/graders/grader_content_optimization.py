@@ -21,8 +21,8 @@ def grade(history: List[Tuple[Dict[str, Any], float]]) -> float:
         Mean engagement reward clamped to [0.0, 1.0].
     """
     if not history:
-        return 0.0
+        return 0.01
 
     rewards = [float(r) for _, r in history]
     score = float(np.mean(rewards))
-    return max(0.0, min(1.0, round(score, 3)))
+    return max(0.01, min(0.99, round(score, 3)))

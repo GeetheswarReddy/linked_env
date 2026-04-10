@@ -19,7 +19,7 @@ def grade(history: List[Tuple[Dict[str, Any], float]]) -> float:
         Best single post engagement score clamped to [0.0, 1.0].
     """
     if not history:
-        return 0.0
+        return 0.01
 
     best = max(float(r) for _, r in history)
-    return max(0.0, min(1.0, round(best, 3)))
+    return max(0.01, min(0.99, round(best, 3)))

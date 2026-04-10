@@ -128,7 +128,7 @@ def grade(request: GradeRequest) -> Dict[str, Any]:
             "passed": False,
         }
     score = float(grader_fn(request.history))
-    score = min(max(score, 0.0), 1.0)
+    score = min(max(score, 0.01), 0.99)
     task_meta = next((t for t in TASKS if t["id"] == request.task), {})
     return {
         "score": round(score, 3),
